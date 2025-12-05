@@ -1,0 +1,90 @@
+<policies>
+    <inbound>
+        <base />
+    </inbound>
+    
+    <backend>
+        <base />
+    </backend>
+    
+    <outbound>
+        <base />
+        
+        <!-- REST API 응답을 MCP 포맷으로 변환 -->
+        
+        <!-- 원본 응답 저장 -->
+        <set-variable name="original-response" value="@(context.Response.Body.As<string>(preserveContent: true))" />
+        
+        <!-- MCP 응답 포맷으로 변환 -->
+        <set-body>@{
+            var originalBody = context.Variables.GetValueOrDefault<string>("original-response");
+            
+            // Weather API 응답 예시
+            try {
+                var weatherData = JObject.Parse(originalBody);
+                
+                var mcpResponse = new JObject();
+                mcpResponse["content"] = new JArray(
+                    new JObject(
+                        new JProperty("type", "text"),
+                        new JProperty("text", string.Format(
+                            "도시: {0}\n온도: {1}°C\n날씨: {2}\n습도: {3}%",
+                            weatherData["name"],
+                            weatherData["main"]?["temp"],
+                            weatherData["weather"]?[0]?["description"],
+                            weatherData["main"]?["humidity"]
+                        ))
+                    )
+                );
+                
+                return mcpResponse.ToString();
+            } catch (Exception ex) {
+                // 변환 실패 시 에러 응답
+                var errorResponse = new JObject();
+                errorResponse["content"] = new JArray(
+                    new JObject(
+                        new JProperty("type", "text"),
+                        new JProperty("text", "응답 변환 오류: " + ex.Message)
+                    )
+                );
+                errorResponse["isError"] = true;
+                
+                return errorResponse.ToString();
+            }
+        }</set-body>
+        
+        <!-- Content-Type 설정 -->
+        <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+        </set-header>
+        
+        <!-- 로깅 -->
+        <trace source="transform-response" severity="information">
+            <message>Transformed REST API response to MCP format</message>
+        </trace>
+    </outbound>
+    
+    <on-error>
+        <base />
+        
+        <!-- 에러도 MCP 포맷으로 변환 -->
+        <return-response>
+            <set-status code="@(context.Response.StatusCode)" />
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <set-body>@{
+                var errorResponse = new JObject();
+                errorResponse["content"] = new JArray(
+                    new JObject(
+                        new JProperty("type", "text"),
+                        new JProperty("text", context.LastError?.Message ?? "Unknown error")
+                    )
+                );
+                errorResponse["isError"] = true;
+                
+                return errorResponse.ToString();
+            }</set-body>
+        </return-response>
+    </on-error>
+</policies>

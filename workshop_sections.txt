@@ -1,0 +1,8 @@
+Section 0: Environment Setup
+Section 1: Azure Functions MCP Server
+Section 2: APIM Enterprise Gateway
+Section 3: Transform REST API to MCP
+Section 4: OpenID Connect Authentication
+Section 5: External Entra ID Integration
+Section 6: Monitoring and Optimization
+Section 7: Cleanup

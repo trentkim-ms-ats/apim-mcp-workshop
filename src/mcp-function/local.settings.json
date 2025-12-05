@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "MCP_PROTOCOL_VERSION": "2024-11-05",
+    "MCP_SERVER_NAME": "Azure-MCP-Functions-Server"
+  }
+}

@@ -1,0 +1,71 @@
+<policies>
+    <inbound>
+        <base />
+        
+        <!-- REST API 요청을 MCP 포맷으로 변환 -->
+        
+        <!-- MCP 요청 파싱 -->
+        <set-variable name="mcp-tool-name" value="@{
+            var body = context.Request.Body.As<JObject>(preserveContent: true);
+            return body?["name"]?.ToString() ?? "";
+        }" />
+        
+        <set-variable name="mcp-arguments" value="@{
+            var body = context.Request.Body.As<JObject>(preserveContent: true);
+            return body?["arguments"]?.ToString() ?? "{}";
+        }" />
+        
+        <!-- 예: Weather API 호출 변환 -->
+        <choose>
+            <when condition="@(context.Variables.GetValueOrDefault<string>("mcp-tool-name") == "get_weather")">
+                <!-- MCP arguments에서 city 파라미터 추출 -->
+                <set-variable name="city" value="@{
+                    var args = JObject.Parse(context.Variables.GetValueOrDefault<string>("mcp-arguments"));
+                    return args["city"]?.ToString() ?? "Seoul";
+                }" />
+                
+                <!-- Backend URL 재작성 -->
+                <rewrite-uri template="/data/2.5/weather" copy-unmatched-params="false" />
+                
+                <!-- 쿼리 파라미터 설정 -->
+                <set-query-parameter name="q" exists-action="override">
+                    <value>@(context.Variables.GetValueOrDefault<string>("city"))</value>
+                </set-query-parameter>
+                <set-query-parameter name="appid" exists-action="override">
+                    <value>{{WEATHER_API_KEY}}</value>
+                </set-query-parameter>
+                <set-query-parameter name="units" exists-action="override">
+                    <value>metric</value>
+                </set-query-parameter>
+                
+                <!-- HTTP Method 변경 -->
+                <set-method>GET</set-method>
+                
+                <!-- 불필요한 Body 제거 -->
+                <set-body />
+            </when>
+            
+            <!-- 다른 Tool 변환 예시 -->
+            <otherwise>
+                <!-- 기본 처리: MCP 요청을 그대로 전달 -->
+            </otherwise>
+        </choose>
+        
+        <!-- 로깅 -->
+        <trace source="transform-request" severity="information">
+            <message>@($"Transform MCP tool '{context.Variables.GetValueOrDefault<string>("mcp-tool-name")}' to REST API")</message>
+        </trace>
+    </inbound>
+    
+    <backend>
+        <base />
+    </backend>
+    
+    <outbound>
+        <base />
+    </outbound>
+    
+    <on-error>
+        <base />
+    </on-error>
+</policies>
