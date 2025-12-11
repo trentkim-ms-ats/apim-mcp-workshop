@@ -1,6 +1,7 @@
 # Environment files
 .env
 .env.local
+workshop_config.json
 
 # Python
 __pycache__/

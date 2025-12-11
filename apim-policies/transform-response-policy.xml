@@ -13,31 +13,65 @@
         <!-- REST API 응답을 MCP 포맷으로 변환 -->
         
         <!-- 원본 응답 저장 -->
-        <set-variable name="original-response" value="@(context.Response.Body.As<string>(preserveContent: true))" />
+        <set-variable name="original-response" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" />
         
         <!-- MCP 응답 포맷으로 변환 -->
         <set-body>@{
-            var originalBody = context.Variables.GetValueOrDefault<string>("original-response");
+            var originalBody = context.Variables.GetValueOrDefault&lt;string&gt;("original-response");
             
-            // Weather API 응답 예시
             try {
-                var weatherData = JObject.Parse(originalBody);
+                // JSONPlaceholder Todos 응답 처리
+                // 배열인 경우: 할 일 목록 (list_todos)
+                // 객체인 경우: 단일 할 일 (get_todo)
                 
-                var mcpResponse = new JObject();
-                mcpResponse["content"] = new JArray(
-                    new JObject(
-                        new JProperty("type", "text"),
-                        new JProperty("text", string.Format(
-                            "도시: {0}\n온도: {1}°C\n날씨: {2}\n습도: {3}%",
-                            weatherData["name"],
-                            weatherData["main"]?["temp"],
-                            weatherData["weather"]?[0]?["description"],
-                            weatherData["main"]?["humidity"]
-                        ))
-                    )
-                );
+                if (originalBody.TrimStart().StartsWith("[")) {
+                    // 배열 응답: 할 일 목록
+                    var todos = JArray.Parse(originalBody);
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine("할 일 목록 (처음 5개):");
+                    sb.AppendLine("-------------------------");
+                    
+                    int count = todos.Count &gt; 5 ? 5 : todos.Count;
+                    for (int i = 0; i &lt; count; i++) {
+                        var todo = todos[i];
+                        var status = (bool)todo["completed"] ? "[완료]" : "[미완료]";
+                        sb.AppendLine(status + " [" + todo["id"] + "] " + todo["title"]);
+                    }
+                    
+                    sb.AppendLine("-------------------------");
+                    sb.AppendLine("총 " + todos.Count + "개의 할 일이 있습니다.");
+                    
+                    var mcpResponse = new JObject();
+                    mcpResponse["content"] = new JArray(
+                        new JObject(
+                            new JProperty("type", "text"),
+                            new JProperty("text", sb.ToString())
+                        )
+                    );
+                    return mcpResponse.ToString();
+                    
+                } else {
+                    // 객체 응답: 단일 할 일
+                    var todo = JObject.Parse(originalBody);
+                    var status = (bool)todo["completed"] ? "완료" : "미완료";
+                    var text = string.Format(
+                        "할 일 상세\n-------------------------\nID: {0}\n제목: {1}\n상태: {2}\n담당자 ID: {3}",
+                        todo["id"],
+                        todo["title"],
+                        status,
+                        todo["userId"]
+                    );
+                    
+                    var mcpResponse = new JObject();
+                    mcpResponse["content"] = new JArray(
+                        new JObject(
+                            new JProperty("type", "text"),
+                            new JProperty("text", text)
+                        )
+                    );
+                    return mcpResponse.ToString();
+                }
                 
-                return mcpResponse.ToString();
             } catch (Exception ex) {
                 // 변환 실패 시 에러 응답
                 var errorResponse = new JObject();

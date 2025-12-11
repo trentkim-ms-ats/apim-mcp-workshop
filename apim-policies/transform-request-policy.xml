@@ -2,50 +2,54 @@
     <inbound>
         <base />
         
-        <!-- REST API 요청을 MCP 포맷으로 변환 -->
+        <!-- MCP 요청을 REST API 요청으로 변환 -->
         
         <!-- MCP 요청 파싱 -->
         <set-variable name="mcp-tool-name" value="@{
-            var body = context.Request.Body.As<JObject>(preserveContent: true);
-            return body?["name"]?.ToString() ?? "";
+            var body = context.Request.Body.As&lt;JObject&gt;(preserveContent: true);
+            var toolName = body?[&quot;params&quot;]?[&quot;name&quot;]?.ToString() ?? body?[&quot;name&quot;]?.ToString() ?? &quot;&quot;;
+            return toolName;
         }" />
         
         <set-variable name="mcp-arguments" value="@{
-            var body = context.Request.Body.As<JObject>(preserveContent: true);
-            return body?["arguments"]?.ToString() ?? "{}";
+            var body = context.Request.Body.As&lt;JObject&gt;(preserveContent: true);
+            var args = body?[&quot;params&quot;]?[&quot;arguments&quot;]?.ToString() ?? body?[&quot;arguments&quot;]?.ToString() ?? &quot;{}&quot;;
+            return args;
         }" />
         
-        <!-- 예: Weather API 호출 변환 -->
+        <!-- JSONPlaceholder Todos API 변환 -->
         <choose>
-            <when condition="@(context.Variables.GetValueOrDefault<string>("mcp-tool-name") == "get_weather")">
-                <!-- MCP arguments에서 city 파라미터 추출 -->
-                <set-variable name="city" value="@{
-                    var args = JObject.Parse(context.Variables.GetValueOrDefault<string>("mcp-arguments"));
-                    return args["city"]?.ToString() ?? "Seoul";
-                }" />
-                
+            <!-- list_todos: 전체 할 일 목록 조회 -->
+            <when condition="@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;mcp-tool-name&quot;) == &quot;list_todos&quot;)">
                 <!-- Backend URL 재작성 -->
-                <rewrite-uri template="/data/2.5/weather" copy-unmatched-params="false" />
+                <rewrite-uri template="/todos" copy-unmatched-params="false" />
                 
-                <!-- 쿼리 파라미터 설정 -->
-                <set-query-parameter name="q" exists-action="override">
-                    <value>@(context.Variables.GetValueOrDefault<string>("city"))</value>
-                </set-query-parameter>
-                <set-query-parameter name="appid" exists-action="override">
-                    <value>{{WEATHER_API_KEY}}</value>
-                </set-query-parameter>
-                <set-query-parameter name="units" exists-action="override">
-                    <value>metric</value>
-                </set-query-parameter>
-                
-                <!-- HTTP Method 변경 -->
+                <!-- HTTP Method 변경: POST → GET -->
                 <set-method>GET</set-method>
                 
-                <!-- 불필요한 Body 제거 -->
+                <!-- Body 제거 (GET 요청) -->
                 <set-body />
             </when>
             
-            <!-- 다른 Tool 변환 예시 -->
+            <!-- get_todo: 특정 할 일 조회 -->
+            <when condition="@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;mcp-tool-name&quot;) == &quot;get_todo&quot;)">
+                <!-- MCP arguments에서 id 파라미터 추출 -->
+                <set-variable name="todo-id" value="@{
+                    var args = JObject.Parse(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;mcp-arguments&quot;));
+                    return args[&quot;id&quot;]?.ToString() ?? &quot;1&quot;;
+                }" />
+                
+                <!-- Backend URL 재작성 -->
+                <rewrite-uri template="@(&quot;/todos/&quot; + context.Variables.GetValueOrDefault&lt;string&gt;(&quot;todo-id&quot;))" copy-unmatched-params="false" />
+                
+                <!-- HTTP Method 변경: POST → GET -->
+                <set-method>GET</set-method>
+                
+                <!-- Body 제거 -->
+                <set-body />
+            </when>
+            
+            <!-- 기타 Tool -->
             <otherwise>
                 <!-- 기본 처리: MCP 요청을 그대로 전달 -->
             </otherwise>
@@ -53,7 +57,7 @@
         
         <!-- 로깅 -->
         <trace source="transform-request" severity="information">
-            <message>@($"Transform MCP tool '{context.Variables.GetValueOrDefault<string>("mcp-tool-name")}' to REST API")</message>
+            <message>@($"Transform MCP tool '{context.Variables.GetValueOrDefault&lt;string&gt;(&quot;mcp-tool-name&quot;)}' to REST API")</message>
         </trace>
     </inbound>
     
